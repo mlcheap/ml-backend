@@ -55,8 +55,6 @@ def create_app(test_config=None):
     # model name to function map 
     modelname2func = {'tfidf_knn': train_tfidf_knn}
     Path("models/").mkdir(parents=True, exist_ok=True)
-    Path("data/vacancies").mkdir(parents=True, exist_ok=True)
-    Path("data/esco").mkdir(parents=True, exist_ok=True)
 
     
     @app.route('/js/<name>', methods=['GET', 'POST'])
