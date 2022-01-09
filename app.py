@@ -56,6 +56,8 @@ def create_app(test_config=None):
     # model name to function map 
     modelname2func = {'tfidf_knn': train_tfidf_knn}
     Path("models/").mkdir(parents=True, exist_ok=True)
+    with open("models/log.jl","a") as f:
+        f.write("");
 
     
     @app.route('/js/<name>', methods=['GET', 'POST'])
