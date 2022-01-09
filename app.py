@@ -25,24 +25,25 @@ def read_template(name):
 def load_skillLab_DB():
     DB_USER = "amir"
     DB_PASS = '8JF9hb!7VD@L'
-    DB_HOST = "127.0.0.1"
 
-    VACANCIES_PORT = "5432"
+    VAC_PORT = "5432"
     VAC_DBNAME = "postgres"
+    VAC_HOST = "vacancies"
 
-    SKILLMAP_PORT = "5433"
+    SKILL_PORT = "5432"
     SKILL_DBNAME = "web_production"
+    SKILL_HOST = "skillmap"
 
     vac_conn = pg.connect(user=DB_USER,
                     password=DB_PASS,
-                    host=DB_HOST,
-                    port=VACANCIES_PORT,
+                    host=VAC_HOST,
+                    port=VAC_PORT,
                     database=VAC_DBNAME)
 
     skill_conn = pg.connect(user=DB_USER,
                     password=DB_PASS,
-                    host=DB_HOST,
-                    port=SKILLMAP_PORT,
+                    host=SKILL_HOST,
+                    port=SKILL_PORT,
                     database=SKILL_DBNAME)
     return vac_conn, skill_conn
     
