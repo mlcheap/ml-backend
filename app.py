@@ -46,6 +46,22 @@ def load_skillLab_DB():
                     port=SKILL_PORT,
                     database=SKILL_DBNAME)
     return vac_conn, skill_conn
+
+
+def sql_all_tags(lang,conn):
+    if lang=='ar':
+        occupation_local = psql.read_sql(f"""
+        SELECT * FROM occupation_translations
+        WHERE description IS NOT NULL
+        AND locale='{lang}'
+        """, conn)
+    else:
+        occupation_local = psql.read_sql(f"""
+        SELECT * FROM occupation_translations
+        WHERE alternates IS NOT NULL
+        AND locale='{lang}'
+        """, conn)
+    return occupation_local
     
 
 def create_app(test_config=None):
@@ -95,11 +111,7 @@ def create_app(test_config=None):
     @app.route('/all-tags', methods=['GET'])
     def get_all_tags():
         lang = request.args.get('lang')
-        occupation_local = psql.read_sql(f"""
-        SELECT * FROM occupation_translations 
-        WHERE alternates IS NOT NULL 
-        AND locale='{lang}'
-        """, skill_conn)
+        occupation_local = sql_all_tags(lang, skill_conn)
         return Response(occupation_local.to_json(orient="table"), mimetype='application/json') 
     
         
@@ -109,7 +121,6 @@ def create_app(test_config=None):
         lang = request.args.get('lang')
         occ = psql.read_sql(f"""
         SELECT * FROM occupation_translations 
-        WHERE alternates IS NOT NULL 
         AND locale='{lang}' 
         AND occupation_id={id}
         """, skill_conn)
@@ -133,11 +144,12 @@ def create_app(test_config=None):
             data = request.get_json()
             train_func = modelname2func[data['model_name']]
             lang = data['lang']
-            occ_local = psql.read_sql(f"""
-            SELECT * FROM occupation_translations 
-            WHERE alternates IS NOT NULL 
-            AND locale='{lang}'
-            """, skill_conn)
+            occ_local = sql_all_tags(lang, skill_conn)
+            #occ_local = psql.read_sql(f"""
+            #SELECT * FROM occupation_translations 
+            #WHERE alternates IS NOT NULL 
+            #AND locale='{lang}'
+            #""", skill_conn)
 
             model, params = train_func(occ_local=occ_local,**data)
             response.update(params)
