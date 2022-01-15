@@ -4,4 +4,5 @@ WORKDIR /home
 COPY requirements.txt requirements.txt
 RUN python3 -m pip install --upgrade pip && pip3 install -r requirements.txt
 COPY . .
-CMD ["flask", "run"]
+RUN chmod +x ./start.sh
+CMD ./start.sh
