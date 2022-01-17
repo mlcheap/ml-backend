@@ -2,11 +2,14 @@
 import json
 import sys
 import logging
+import requests
 
 
 from pathlib import Path
 
 import psycopg2 as pg
+import pandas.io.sql as psql
+
 
 from flask import Response
 from flask import Flask
@@ -194,5 +197,35 @@ def create_app(test_config=None):
         #     return f"model id not found" 
         # except Exception as err:
         #     return f"Error {type(err)}\nMessage: {err}"
+    
+    @app.route('/search', methods=['GET'])
+    def search_text():
+        data = request.json
+        #app.logger.info(f'top-tags: {data}')
+        text = request.args.get('text')
+        lang = request.args.get('lang')
+        limit = request.args.get('limit')
+        
+        
+        host = "https://taxonomy-service-tugjhopyrq-ez.a.run.app"
+        url = f"{host}/search?text={text}&language={lang}&type=occupation&limit={limit}&full=false"
+
+        payload={}
+        headers = {
+          'Accept': 'application/json'
+        }
+
+        response = requests.request("GET", url, headers=headers, data=payload)
+        response = response.json()
+        uris = [occ['uri'] for occ in response['_embedded']['results']]
+        uris = str(uris).replace(']',')').replace('[','(')
+        occupations = psql.read_sql(f"""
+                    SELECT * FROM occupations 
+                    LEFT JOIN occupation_translations ON occupations.id=occupation_translations.occupation_id
+                    WHERE data_set='esco'
+                    AND occupation_translations.locale='{lang}'
+                    AND external_id IN {uris}
+                    """, skill_conn)
+        return Response(occupations.to_json(orient='table'), mimetype='application/json')
 
     return app
