@@ -54,19 +54,32 @@ def load_skillLab_DB():
 
 
 def sql_all_tags(lang,conn):
-    if lang=='ar':
-        occupation_local = psql.read_sql(f"""
-        SELECT * FROM occupation_translations
-        WHERE description IS NOT NULL
-        AND locale='{lang}'
-        """, conn)
-    else:
-        occupation_local = psql.read_sql(f"""
-        SELECT * FROM occupation_translations
-        WHERE alternates IS NOT NULL
-        AND locale='{lang}'
+    occupation_local = psql.read_sql(f"""
+        SELECT * FROM
+        (SELECT * FROM occupations WHERE data_set='esco') AS occ 
+        LEFT JOIN (SELECT * FROM occupation_translations WHERE locale='{lang}') as occtr
+        ON occ.id=occtr.occupation_id
         """, conn)
     return occupation_local
+
+
+def esco_solr_search(text, lang, limit):
+    model = "https://taxonomy-service-tugjhopyrq-ez.a.run.app"
+    url = f"{model}/search"
+
+    payload={}
+    headers = {
+      'Accept': 'application/json'
+    }
+    params = {
+        'text': text,
+        'language': lang,
+        'limit': limit,
+        'full': 'false',
+    }
+
+    response = requests.request("GET", url, headers=headers, params=params, data=payload)
+    return response.json()
     
 
 def create_app(test_config=None):
@@ -201,30 +214,23 @@ def create_app(test_config=None):
     @app.route('/search', methods=['GET'])
     def search_text():
         data = request.json
-        #app.logger.info(f'top-tags: {data}')
+        app.logger.info(f'search: {data}')
         text = request.args.get('text')
         lang = request.args.get('lang')
         limit = request.args.get('limit')
         
-        
-        host = "https://taxonomy-service-tugjhopyrq-ez.a.run.app"
-        url = f"{host}/search?text={text}&language={lang}&type=occupation&limit={limit}&full=false"
-
-        payload={}
-        headers = {
-          'Accept': 'application/json'
-        }
-
-        response = requests.request("GET", url, headers=headers, data=payload)
-        response = response.json()
+        response = esco_solr_search(text, lang, limit)
         uris = [occ['uri'] for occ in response['_embedded']['results']]
         uris = str(uris).replace(']',')').replace('[','(')
         occupations = psql.read_sql(f"""
-                    SELECT * FROM occupations 
-                    LEFT JOIN occupation_translations ON occupations.id=occupation_translations.occupation_id
-                    WHERE data_set='esco'
-                    AND occupation_translations.locale='{lang}'
-                    AND external_id IN {uris}
+                    SELECT * FROM 
+                            (SELECT * FROM occupations 
+                            WHERE data_set='esco'
+                            AND external_id IN {uris}) AS occ 
+                        LEFT JOIN 
+                            (SELECT * FROM occupation_translations 
+                            WHERE locale='{lang}') AS occtr
+                        ON occ.id=occtr.occupation_id
                     """, skill_conn)
         return Response(occupations.to_json(orient='table'), mimetype='application/json')
 
