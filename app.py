@@ -80,6 +80,26 @@ def esco_solr_search(text, lang, limit):
 
     response = requests.request("GET", url, headers=headers, params=params, data=payload)
     return response.json()
+
+
+def esco_solr_occupations(text, lang, limit, conn):
+    response = esco_solr_search(text, lang, limit)
+    uris = [occ['uri'] for occ in response['_embedded']['results']]
+    if len(uris)==0:
+        return None
+    uris = str(uris).replace(']',')').replace('[','(')
+    occupations = psql.read_sql(f"""
+                SELECT * FROM 
+                        (SELECT * FROM occupations 
+                        WHERE data_set='esco'
+                        AND external_id IN {uris}) AS occ 
+                    LEFT JOIN 
+                        (SELECT * FROM occupation_translations 
+                        WHERE locale='{lang}') AS occtr
+                    ON occ.id=occtr.occupation_id
+                """, conn)
+    return occupations
+    
     
 
 def create_app(test_config=None):
@@ -189,21 +209,28 @@ def create_app(test_config=None):
     def predict():
         # try:
         data = request.json
-        #app.logger.info(f'top-tags: {data}')
+        # app.logger.info(f'top-tags: {data}')
         text, id = data['description'], data['id']
         excluded =  data['excluded'] if 'excluded' in data else []
-        topN = data['topN'] if 'topN' in data else 50
-        title = data['title'] if ('title' in data.keys()) else ''
+        limit = data['limit'] if 'limit' in data else 50
+        title = data['title'] if 'title' in data else ''
         if id in loaded_models:
             model = loaded_models[id]
         else:
             model = pickle.load(open(f'models/{id}.pk','rb'))
             loaded_models[id] = model
+        if False and title==text: # apply search 
+            occupations = esco_solr_occupations(text, model['meta']['lang'],limit+len(excluded), conn=skill_conn)
+            app.logger.info(f'occupations #: {len(occupations)}')
+            solr_response = [{'index': str(id), 'distance': 1-1.0/(i+1)} 
+                        for i,id in enumerate(occupations.occupation_id.values) 
+                        if id not in excluded] 
+            # return Response(json.dumps(response), mimetype='application/json')
         title = (title + ' ')*model['meta']['title_imp']
         distances, indices = predict_top_tags(model, title + ' ' + text)
         response = [{'index': i, 'distance': d} for i,d in zip(indices,distances) if i not in excluded] 
-        response = response[:topN]
-        return Response(json.dumps(response), mimetype='application/json')
+        # response = solr_response + response
+        return Response(json.dumps(response[:limit]), mimetype='application/json')
         # except KeyError as err:
         #     return f"required field not provided: {err}" 
         # except FileNotFoundError as err:
@@ -219,19 +246,7 @@ def create_app(test_config=None):
         lang = request.args.get('lang')
         limit = request.args.get('limit')
         
-        response = esco_solr_search(text, lang, limit)
-        uris = [occ['uri'] for occ in response['_embedded']['results']]
-        uris = str(uris).replace(']',')').replace('[','(')
-        occupations = psql.read_sql(f"""
-                    SELECT * FROM 
-                            (SELECT * FROM occupations 
-                            WHERE data_set='esco'
-                            AND external_id IN {uris}) AS occ 
-                        LEFT JOIN 
-                            (SELECT * FROM occupation_translations 
-                            WHERE locale='{lang}') AS occtr
-                        ON occ.id=occtr.occupation_id
-                    """, skill_conn)
+        occupations = esco_solr_occupations(text, lang, limit, conn=skill_conn)
         return Response(occupations.to_json(orient='table'), mimetype='application/json')
 
     return app
