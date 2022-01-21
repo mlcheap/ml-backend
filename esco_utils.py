@@ -67,12 +67,13 @@ def train_tfidf_knn(occ_local, model_name,lang,ngram_min=1,ngram_max=4,n_neighbo
     return model, meta
 
 
-def predict_top_tags(model, text, p=0.1):
+def predict_top_tags(model, text, p):
     occ_id,vectorizer,knn_index = model['occupation_id'], model['vectorizer'], model['knn_index'] 
     X = vectorizer.transform([text])
     distances, indices = model['knn_index'].kneighbors(X)
     occ_indices = [int(occ_id[i]) for i in indices[0]]
     confidence = [float(d) for d in distances[0]]
+    random.seed(abs(hash(text))) 
     for i in range(len(occ_indices)):
         if random.random()<p:
             occ_indices[i] = random.choice(occ_id)
