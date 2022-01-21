@@ -218,6 +218,7 @@ def create_app(test_config=None):
         excluded =  data['excluded'] if 'excluded' in data else []
         limit = data['limit'] if 'limit' in data else 50
         title = data['title'] if 'title' in data else ''
+        noise = data['noise'] if 'noise' in data else 0.1
         if not isinstance(title,str):
             title = ''
         if not isinstance(text,str):
@@ -230,16 +231,15 @@ def create_app(test_config=None):
         
         if title==text: # apply search 
             occupations = esco_solr_occupations(text, model['meta']['lang'],limit+len(excluded), conn=skill_conn)
-            # app.logger.info(f'occupations #: {len(occupations)}')
-            solr_response = [{'index': str(id), 'distance': 1-1.0/(i+1)} 
+            response = [{'index': str(id), 'distance': 1-1.0/(i+1)} 
                         for i,id in enumerate(occupations.occupation_id.values) 
                         if id not in excluded] 
         else:
-            solr_response = []
-        title = (title + ' ')*model['meta']['title_imp']
-        distances, indices = predict_top_tags(model, title + ' ' + text)
-        response = [{'index': i, 'distance': d} for i,d in zip(indices,distances) if i not in excluded] 
-        response = solr_response + response
+            # solr_response = []
+            title = (title + ' ')*model['meta']['title_imp']
+            distances, indices = predict_top_tags(model, title + ' ' + text, p=noise)
+            response = [{'index': i, 'distance': d} for i,d in zip(indices,distances) if i not in excluded] 
+            # response = solr_response + response
         return Response(json.dumps(response[:limit]), mimetype='application/json')
         # except KeyError as err:
         #     return f"required field not provided: {err}" 
