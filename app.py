@@ -81,7 +81,7 @@ def esco_solr_search(text, lang, limit):
     response = requests.request("GET", url, headers=headers, params=params, data=payload)
     try:
         response = response.json()
-    except JSONDecodeError:
+    except Exception:
         response = {}
     return response
 
