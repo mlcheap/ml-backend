@@ -90,7 +90,7 @@ def esco_solr_occupations(text, lang, limit, conn):
     response = esco_solr_search(text, lang, limit)
     uris = [occ['uri'] for occ in response['_embedded']['results']]
     if len(uris)==0:
-        return None
+        return pd.DataFrame(columns=['occupation_id'])
     uris = str(uris).replace(']',')').replace('[','(')
     occupations = psql.read_sql(f"""
                 SELECT * FROM 
@@ -260,3 +260,4 @@ def create_app(test_config=None):
         return Response(occupations.to_json(orient='table'), mimetype='application/json')
 
     return app
+
